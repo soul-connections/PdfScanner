@@ -10,10 +10,10 @@ import AccountsDrawer from "./AccountsDrawer";
 
 const Tab = createBottomTabNavigator();
 
-function ProfileScreen() {
+function FilesScreen() {
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Profile Screen</Text>
+      <Text>Files Screen</Text>
     </View>
   )
 }
@@ -60,7 +60,7 @@ const BottomTabs = () => {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: "white",
-        tabBarInactiveTintColor: "#555",
+        tabBarInactiveTintColor: "grey",
         tabBarStyle: {
           backgroundColor: "#014955",
           paddingTop: 10
@@ -68,7 +68,7 @@ const BottomTabs = () => {
       })}
     >
       <Tab.Screen name="Home" component={StackNavigator} options={{ title: '' }} />
-      <Tab.Screen name="Files" component={ProfileScreen} options={{ title: '' }} />
+      <Tab.Screen name="Files" component={FilesScreen} options={{ title: '' }} />
       <Tab.Screen name="Settings" component={SettingScreen} options={{ title: '' }} />
     </Tab.Navigator>
   );

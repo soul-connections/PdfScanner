@@ -57,6 +57,9 @@ const AccountsDrawer = () => {
                                     placeholderTextColor="#999"
                                     secureTextEntry={true}
                                 />
+                                <TouchableOpacity style={styles.forgotButton} onPress={() => setFormVisible(!formVisible)}>
+                                    <Text style={styles.forgotButtonText}>Forgot Password?</Text>
+                                </TouchableOpacity>
                                 {/* Login Button */}
                                 < TouchableOpacity style={styles.loginButton}>
                                     <Text style={styles.loginButtonText}>Login</Text>
@@ -65,7 +68,53 @@ const AccountsDrawer = () => {
                                     <Text style={styles.signupLinkButtonText}>Sign Up</Text>
                                 </TouchableOpacity>
                             </>
-                        ) : ("")}
+                        ) : (
+                            <>
+                                <Text style={styles.label}>Sign Up</Text>
+
+                                {/* Full Name Input */}
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Full Name"
+                                    placeholderTextColor="#999"
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                />
+
+                                {/* Username/Email Input */}
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Username or Email"
+                                    placeholderTextColor="#999"
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                />
+
+                                {/* Phone Input */}
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Phone Number"
+                                    placeholderTextColor="#999"
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                />
+
+                                {/* Password Input */}
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Password"
+                                    placeholderTextColor="#999"
+                                    secureTextEntry={true}
+                                />
+                                {/* Login Button */}
+                                < TouchableOpacity style={styles.loginButton}>
+                                    <Text style={styles.loginButtonText}>Sign Up</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.signupLinkButton} onPress={() => setFormVisible(!formVisible)}>
+                                    <Text style={styles.signupLinkButtonText}>Login</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
                     </View>
 
                 </View>
@@ -89,7 +138,8 @@ const styles = StyleSheet.create({
     },
     modalContainer: {
         width: '90%',
-        height: '50%',
+        paddingTop: 50,
+        paddingBottom: 50,
         backgroundColor: '#014955',
         borderRadius: 5,
         justifyContent: 'center',
@@ -121,7 +171,7 @@ const styles = StyleSheet.create({
     loginButton: {
         width: '80%',
         padding: 15,
-        marginTop: 20,
+        marginTop: 10,
         backgroundColor: '#007BFF',
         borderRadius: 8,
         alignItems: 'center',
@@ -133,13 +183,24 @@ const styles = StyleSheet.create({
     },
     signupLinkButton: {
         width: '80%',
-        marginTop: 20,
+        marginTop: 25,
         alignItems: 'flex-end'
     },
     signupLinkButtonText: {
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    forgotButton: {
+        width: '80%',
+        alignItems: 'flex-end',
+        marginTop:10
+    },
+    forgotButtonText: {
+        color: '#ccc',
+        fontSize: 12,
+        fontWeight: 'bold',
+        textDecorationLine:'underline'
     },
     closeButton: {
         position: 'absolute',
