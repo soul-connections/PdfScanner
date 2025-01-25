@@ -1,0 +1,446 @@
+import React, { useState } from "react";
+import { Text, View, TouchableOpacity, Image, StyleSheet, FlatList, Alert, Modal, Pressable } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import AntDesign from "react-native-vector-icons/AntDesign";
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import Foundation from "react-native-vector-icons/Foundation";
+import SimpleLineIcons from "react-native-vector-icons/SimpleLineIcons";
+import { launchCamera } from "react-native-image-picker";
+import Realm from "realm";
+import { PDFDocument } from "pdf-lib";
+import RNFS from "react-native-fs";
+import FileViewer from "react-native-file-viewer";
+
+// Initialize Realm Schema
+const realm = new Realm({
+    schema: [
+        {
+            name: "Document",
+            primaryKey: "id",
+            properties: {
+                id: "int",
+                name: "string",
+                filePath: "string",
+                createdAt: "string",
+                createdDate: "string",
+                createdTime: "string",
+                updatedAt: "string",
+                updatedDate: "string",
+                updatedTime: "string",
+                lastOpened: "string",
+                deleted: "int",
+                starred: { type: "bool", default: false },
+            },
+        },
+    ],
+});
+
+const Recent = ({ route }) => {
+    const [imageUris, setImageUris] = useState([]);
+    const [files, setFiles] = useState([]);
+    const numColumns = 3;
+    const { viewData = 'list' } = route.params || {};
+
+    const [visible, setVisible] = useState(false);
+    const [selectedItem, setSelectedItem] = useState("Select an item");
+    const items = [
+        { icon: "page-export-pdf", text: "Export PDF" },
+        { icon: "compress", text: "Compress PDF" },
+        { icon: "send", text: "Send a Copy" },
+        { icon: "lock", text: "Set Password" },
+        { icon: "star-o", text: "Star" },
+        { icon: "rename-box", text: "Rename" },
+        { icon: "copy", text: "Duplicate" },
+        { icon: "delete-outline", text: "Delete" },
+    ];
+
+    const handleSelect = (item) => {
+        setSelectedItem(item);
+        setVisible(false);
+    };
+
+    // Fetch files from Realm on component mount
+    React.useEffect(() => {
+        const data = realm.objects("Document");
+        setFiles([...data]);
+    }, []);
+
+    const openCamera = () => {
+        launchCamera(
+            {
+                mediaType: "photo",
+                cameraType: "back",
+                saveToPhotos: true,
+            },
+            (response) => {
+                if (response.didCancel) {
+                    console.log("User cancelled camera operation.");
+                } else if (response.errorCode) {
+                    console.log("Camera error: ", response.errorMessage);
+                } else {
+                    // Add the captured image URI to the array
+                    const newImageUri = response.assets[0]?.uri;
+                    if (newImageUri) {
+                        setImageUris((prevUris) => [...prevUris, newImageUri]);
+                        console.log("Captured Image URI: ", newImageUri);
+                    } else {
+                        console.warn("No URI found for the captured image.");
+                    }
+                }
+            }
+        );
+    };
+
+    const saveFiles = async () => {
+        // Show options (checkbox dialog)
+        const options = ["Save as PNG", "Save as PDF"];
+        Alert.alert(
+            "Save Options",
+            "Choose file formats to save",
+            options.map((option, index) => ({
+                text: option,
+                onPress: () => handleSaveOption(index),
+            }))
+        );
+    };
+
+    const handleSaveOption = async (index) => {
+        if (imageUris.length === 0) {
+            Alert.alert("Error", "No images available to save.");
+            return;
+        }
+
+        const now = new Date();
+        const createdAt = now.toISOString();
+        const createdDate = now.toLocaleDateString();
+        const createdTime = now.toLocaleTimeString();
+
+        if (index === 0) {
+            // Save as PNG
+            imageUris.forEach((uri, idx) => {
+                const fileName = `image_${Date.now()}_${idx + 1}.png`;
+                realm.write(() => {
+                    realm.create("Document", {
+                        id: Date.now() + idx,
+                        name: fileName,
+                        filePath: uri,
+                        createdAt,
+                        createdDate,
+                        createdTime,
+                        updatedAt: createdAt,
+                        updatedDate: createdDate,
+                        updatedTime: createdTime,
+                        lastOpened: "",
+                        deleted: 0,
+                        starred: false,
+                    });
+                });
+            });
+        } else if (index === 1) {
+            try {
+                // Save as PDF
+                const pdfUri = await generatePDF(imageUris); // Pass the `imageUris` array here
+                const fileName = `document_${Date.now()}.pdf`;
+                realm.write(() => {
+                    realm.create("Document", {
+                        id: Date.now(),
+                        name: fileName,
+                        filePath: pdfUri,
+                        createdAt,
+                        createdDate,
+                        createdTime,
+                        updatedAt: createdAt,
+                        updatedDate: createdDate,
+                        updatedTime: createdTime,
+                        lastOpened: "",
+                        deleted: 0,
+                        starred: false,
+                    });
+                });
+            } catch (error) {
+                console.error("Error saving PDF:", error);
+                Alert.alert("Error", "Failed to generate PDF.");
+            }
+        }
+
+        setFiles([...realm.objects("Document")]); // Refresh the files list
+        setImageUris([]); // Clear captured image URIs
+    };
+
+    const generatePDF = async (imageUris) => {
+        console.log("Generating PDF with image URIs:", imageUris);
+
+        if (!Array.isArray(imageUris) || imageUris.length === 0) {
+            throw new Error("No valid images to create PDF.");
+        }
+
+        const pdfPath = `${RNFS.DocumentDirectoryPath}/document_${Date.now()}.pdf`;
+        console.log("PDF Path:", pdfPath);
+
+        try {
+            const pdfDoc = await PDFDocument.create();
+            console.log("PDF Document created.");
+
+            for (const imageUri of imageUris) {
+                console.log("Processing image URI:", imageUri);
+
+                const filePath = imageUri.startsWith("file://") ? imageUri.replace("file://", "") : imageUri;
+
+                try {
+                    const imageBytes = await RNFS.readFile(filePath, "base64");
+                    console.log("Image bytes read successfully.");
+
+                    const extension = filePath.split(".").pop()?.toLowerCase();
+                    let embeddedImage;
+                    if (extension === "jpg" || extension === "jpeg") {
+                        console.log("Embedding JPG image.");
+                        embeddedImage = await pdfDoc.embedJpg(imageBytes);
+                    } else if (extension === "png") {
+                        console.log("Embedding PNG image.");
+                        embeddedImage = await pdfDoc.embedPng(imageBytes);
+                    } else {
+                        console.warn(`Unsupported image format: ${filePath}`);
+                        continue;
+                    }
+
+                    const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
+                    page.drawImage(embeddedImage, {
+                        x: 0,
+                        y: 0,
+                        width: embeddedImage.width,
+                        height: embeddedImage.height,
+                    });
+                    console.log("Image added to PDF page.");
+                } catch (imageError) {
+                    console.error(`Error embedding image: ${filePath}`, imageError);
+                    throw new Error("Failed to process an image.");
+                }
+            }
+
+            const pdfBytes = await pdfDoc.save();
+            console.log("PDF document saved to bytes.");
+
+            // Convert to Base64 without Buffer
+            const pdfBase64 = btoa(
+                new Uint8Array(pdfBytes).reduce(
+                    (data, byte) => data + String.fromCharCode(byte),
+                    ""
+                )
+            );
+            console.log("PDF converted to base64.");
+
+            await RNFS.writeFile(pdfPath, pdfBase64, "base64");
+            console.log("PDF written to file system at:", pdfPath);
+
+            return `file://${pdfPath}`;
+        } catch (error) {
+            console.error("Error during PDF generation:", error);
+            throw new Error("Failed to generate PDF.");
+        }
+    };
+
+
+    const renderFile = ({ item }) => {
+        const handleFilePress = async () => {
+            try {
+                await FileViewer.open(item.filePath, {
+                    showOpenWithDialog: true, // Optional: shows an "Open With" dialog
+                });
+            } catch (error) {
+                console.error("Error opening file:", error);
+                Alert.alert("Error", "Failed to open the file.");
+            }
+        };
+        return (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: "#ccc" }}>
+                <TouchableOpacity style={viewData === 'grid' ? styles.gridItems : styles.listItems} onPress={handleFilePress}>
+                    <AntDesign
+                        name={item.name.endsWith(".pdf") ? "pdffile1" : "jpgfile1"}
+                        size={40}
+                        color={item.name.endsWith(".pdf") ? "red" : "#014955"}
+                    />
+                    <Text style={styles.fileName}>{item.name}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setVisible(true)} style={{ position: 'relative' }}>
+                    <SimpleLineIcons name="options-vertical" size={20} color="#014955" style={{ marginLeft: 10 }} />
+                    <Modal visible={visible} transparent animationType="slide">
+                        <TouchableOpacity
+                            style={styles.overlay}
+                            onPress={() => setVisible(false)}
+                        />
+                        <View style={styles.dropdown}>
+                            <View style={{ borderBottomWidth: 1, borderColor: "#ccc", alignItems: 'flex-start', justifyContent: 'center', height: 40, paddingBottom: 8, marginBottom: 10 }}>
+                                <AntDesign name="close" size={25} color="#014955" style={{ marginLeft: 10 }} onPress={() => setVisible(false)} />
+                            </View>
+                            {items.map(option => (
+                                <Pressable
+                                    key={option.text}
+                                    onPress={() => handlePress(option.text)}
+                                    style={{ flexDirection: 'row', padding: 10, width: '100%', gap: 15, justifyContent: 'flex-start', alignItems: 'center' }}
+                                >
+                                    {option.icon === 'MaterialCommunityIcons' ? (
+                                        <MaterialCommunityIcons name={option.icon} size={24} color='black' style={{ width: 30 }} />
+                                    ) : option.icon === 'Foundation' ? (
+                                        <Foundation name={option.icon} size={24} color='black' style={{ width: 30 }} />
+                                    ) : (
+                                        <FontAwesome name={option.icon} size={24} color='black' style={{ width: 30 }} />
+                                    )}
+
+                                    <Text style={styles.modalText}>{option.text}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </Modal>
+                </TouchableOpacity>
+            </View>
+        );
+
+    }
+
+    return (
+        <View style={styles.container}>
+            {viewData === 'grid' ? (
+                <FlatList
+                    data={files}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderFile}
+                    numColumns={numColumns}
+                    columnWrapperStyle={styles.gridRow}
+                    key={`grid-${numColumns}`}
+                />
+            ) : (
+                <FlatList
+                    data={files}
+                    keyExtractor={(item) => item.id.toString()}
+                    renderItem={renderFile}
+                />
+            )}
+
+
+
+            {imageUris.length > 0 && (
+                <View>
+                    <Text>Captured Images:</Text>
+                    <FlatList
+                        data={imageUris}
+                        horizontal
+                        keyExtractor={(uri, idx) => idx.toString()}
+                        renderItem={({ item }) => (
+                            <Image source={{ uri: item }} style={styles.imagePreview} />
+                        )}
+                    />
+                    <TouchableOpacity onPress={saveFiles} style={styles.saveBtn}>
+                        <Text style={styles.saveText}>Save</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
+
+            <TouchableOpacity onPress={openCamera} style={styles.cameraBtn}>
+                <Text style={styles.cameraTxt}>Scan</Text>
+                <Ionicons name="camera-outline" size={30} color="white" />
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 20,
+    },
+    gridRow: {
+        justifyContent: "space-between",
+    },
+    gridItems: {
+        flex: 1,
+        margin: 10,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#f0f0f0",
+        padding: 10,
+        borderRadius: 10,
+        borderWidth: .2,
+        gap: 10
+    },
+    listItems: {
+        flexDirection: "row",
+        alignItems: "center",
+        padding: 10,
+        justifyContent: 'flex-start',
+        gap: 20
+    },
+    fileName: {
+        fontSize: 18
+    },
+    icon: {
+        marginRight: 10,
+    },
+    imagePreview: {
+        width: 100,
+        height: 100,
+        margin: 10,
+    },
+    cameraBtn: {
+        position: "absolute",
+        bottom: 20,
+        right: 10,
+        backgroundColor: "#014955",
+        borderRadius: 50,
+        padding: 10,
+        width: 120,
+        flexDirection: "row",
+        justifyContent: 'center',
+        alignItems: "center",
+    },
+    cameraTxt: {
+        color: "white",
+        fontSize: 18,
+        marginRight: 5,
+    },
+    saveBtn: {
+        backgroundColor: "#014955",
+        padding: 10,
+        borderRadius: 5,
+        marginVertical: 10,
+        width: 200
+    },
+    saveText: {
+        color: "white",
+        fontWeight: "bold",
+        textAlign: "center",
+    },
+    button: {
+        padding: 10,
+        backgroundColor: "#014955",
+        borderRadius: 5,
+    },
+    buttonText: {
+        color: "#fff",
+        fontSize: 16,
+    },
+    overlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    dropdown: {
+        backgroundColor: "#fff",
+        borderRadius: 15,
+        padding: 10,
+        height: '50%',
+        marginLeft: 2,
+        marginRight: 2
+    },
+    dropdownItem: {
+        padding: 10,
+    },
+    itemText: {
+        fontSize: 16,
+    },
+    modalText: {
+        fontSize: 16
+    }
+});
+
+export default Recent;
+

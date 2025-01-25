@@ -9,7 +9,7 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 
 const AccountsDrawer = () => {
     const [modalVisible, setModalVisible] = useState(false);
-    const [formVisible, setFormVisible] = useState(false);
+    const [formValue, setFormValue] = useState('login');
 
     return (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -37,7 +37,7 @@ const AccountsDrawer = () => {
                                 color="white"
                             />
                         </TouchableOpacity>
-                        {!formVisible ? (
+                        {formValue === 'login' ? (
                             <>
                                 <Text style={styles.label}>Login</Text>
 
@@ -57,18 +57,18 @@ const AccountsDrawer = () => {
                                     placeholderTextColor="#999"
                                     secureTextEntry={true}
                                 />
-                                <TouchableOpacity style={styles.forgotButton} onPress={() => setFormVisible(!formVisible)}>
+                                <TouchableOpacity style={styles.forgotButton} onPress={() => setFormValue('forgot')}>
                                     <Text style={styles.forgotButtonText}>Forgot Password?</Text>
                                 </TouchableOpacity>
                                 {/* Login Button */}
                                 < TouchableOpacity style={styles.loginButton}>
                                     <Text style={styles.loginButtonText}>Login</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.signupLinkButton} onPress={() => setFormVisible(!formVisible)}>
-                                    <Text style={styles.signupLinkButtonText}>Sign Up</Text>
+                                <TouchableOpacity style={styles.signupLinkButton} onPress={() => setFormValue('signup')}>
+                                    <Text style={styles.signupLinkButtonText}>Create New Account</Text>
                                 </TouchableOpacity>
                             </>
-                        ) : (
+                        ) : formValue === 'signup' ? (
                             <>
                                 <Text style={styles.label}>Sign Up</Text>
 
@@ -110,8 +110,32 @@ const AccountsDrawer = () => {
                                 < TouchableOpacity style={styles.loginButton}>
                                     <Text style={styles.loginButtonText}>Sign Up</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={styles.signupLinkButton} onPress={() => setFormVisible(!formVisible)}>
+                                <TouchableOpacity style={styles.signupLinkButton} onPress={() => setFormValue('login')}>
                                     <Text style={styles.signupLinkButtonText}>Login</Text>
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            <>
+                                <Text style={styles.label}>Forgot Password</Text>
+
+
+
+                                {/* Username/Email Input */}
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Username or Email or Phone"
+                                    placeholderTextColor="#999"
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                />
+
+
+                                {/* Forgot Button */}
+                                < TouchableOpacity style={styles.loginButton}>
+                                    <Text style={styles.loginButtonText}>Send Code</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.signupLinkButton} onPress={() => setFormValue('login')}>
+                                    <Text style={styles.signupLinkButtonText}>Back to Login</Text>
                                 </TouchableOpacity>
                             </>
                         )}
@@ -133,7 +157,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)'
+        backgroundColor: 'rgba(0, 0, 0, 0.9)'
 
     },
     modalContainer: {
@@ -194,13 +218,13 @@ const styles = StyleSheet.create({
     forgotButton: {
         width: '80%',
         alignItems: 'flex-end',
-        marginTop:10
+        marginTop: 10
     },
     forgotButtonText: {
         color: '#ccc',
         fontSize: 12,
         fontWeight: 'bold',
-        textDecorationLine:'underline'
+        textDecorationLine: 'underline'
     },
     closeButton: {
         position: 'absolute',

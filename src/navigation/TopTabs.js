@@ -3,19 +3,11 @@ import { useState } from 'react';
 import { Text, View, TouchableOpacity } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { RadioButton } from 'react-native-paper';
+import Recent from '../screens/Recent';
 
 const Tab = createMaterialTopTabNavigator();
 
-function RecentScreen() {
-    return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text>Recent Screen</Text>
-            <View style={{ position: 'absolute', bottom: 20, right:10, backgroundColor: '#014955', borderWidth:2, borderRadius:50, width:73, padding:10, alignItems: 'center', justifyContent:'center' }} onPress={{}}>
-                <Ionicons name="camera-outline" size={50} color="white"/>
-            </View>
-        </View>
-    );
-}
+
 
 function StarredScreen() {
     return (
@@ -28,7 +20,18 @@ function StarredScreen() {
 // Custom Tab Bar
 function CustomTabBar({ state, descriptors, navigation }) {
     const [showFilter, setShowFilter] = useState(false);
-    const [checked, setChecked] = useState('grid');
+    const [checked, setChecked] = useState('list');
+
+    const handleFilterChange = (value) => {
+        setChecked(value);
+        setShowFilter(!showFilter);
+        // Pass the checked value to the Recent tab using navigation
+        const recentRoute = state.routes.find((route) => route.name === 'Recent');
+        if (recentRoute) {
+            navigation.navigate('Recent', { viewData: value });
+        }
+    };
+
     return (
         <>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' }}>
@@ -77,12 +80,18 @@ function CustomTabBar({ state, descriptors, navigation }) {
             </View>
             {showFilter ? (
                 <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                    <RadioButton.Group onValueChange={(value) => setChecked(value)} value={checked}>
-                        <TouchableOpacity style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderColor: '#ccc', borderWidth: 2, padding: 15 }} onPress={() => setChecked('grid')}>
+                    <RadioButton.Group onValueChange={handleFilterChange} value={checked}>
+                        <TouchableOpacity
+                            style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderColor: '#ccc', borderWidth: 2, padding: 15 }}
+                            onPress={() => handleFilterChange('grid')}
+                        >
                             <Text style={{ fontSize: 15, fontWeight: 'bold' }}>Grid</Text>
                             <RadioButton value="grid" />
                         </TouchableOpacity>
-                        <TouchableOpacity style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderColor: '#ccc', borderBottomWidth: 2, padding: 15 }} onPress={() => setChecked('list')}>
+                        <TouchableOpacity
+                            style={{ width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderColor: '#ccc', borderBottomWidth: 2, padding: 15 }}
+                            onPress={() => handleFilterChange('list')}
+                        >
                             <Text style={{ fontSize: 15, fontWeight: 'bold' }}>List</Text>
                             <RadioButton value="list" />
                         </TouchableOpacity>
@@ -97,7 +106,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
 const TopTabs = () => {
     return (
         <Tab.Navigator tabBar={(props) => <CustomTabBar {...props} />}>
-            <Tab.Screen name="Recent" component={RecentScreen} />
+            <Tab.Screen name="Recent" component={Recent} />
             <Tab.Screen name="Starred" component={StarredScreen} />
         </Tab.Navigator>
     );

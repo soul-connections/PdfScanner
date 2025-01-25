@@ -33,7 +33,7 @@ const BottomTabs = () => {
         headerShown: true,
         headerStyle: {
           backgroundColor: "#014955",
-          height: 130
+          height: 130,
         },
         headerLeft: () => (
           <TouchableOpacity>
@@ -63,13 +63,14 @@ const BottomTabs = () => {
         tabBarInactiveTintColor: "grey",
         tabBarStyle: {
           backgroundColor: "#014955",
-          paddingTop: 10
+          paddingTop: 15,
+          height:100
         },
       })}
     >
-      <Tab.Screen name="Home" component={StackNavigator} options={{ title: '' }} />
-      <Tab.Screen name="Files" component={FilesScreen} options={{ title: '' }} />
-      <Tab.Screen name="Settings" component={SettingScreen} options={{ title: '' }} />
+      <Tab.Screen name="Home" component={StackNavigator} options={{ title: 'Home' }} />
+      <Tab.Screen name="Files" component={FilesScreen} options={{ title: 'Files' }} />
+      <Tab.Screen name="Settings" component={SettingScreen} options={{ title: 'Settings' }} />
     </Tab.Navigator>
   );
 };
