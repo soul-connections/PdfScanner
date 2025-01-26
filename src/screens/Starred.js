@@ -16,7 +16,7 @@ import { useFocusEffect } from "@react-navigation/native";
 
 const date = Date.now();
 
-const Recent = ({ route }) => {
+const Starred = ({ route }) => {
     const [imageUris, setImageUris] = useState([]);
     const [files, setFiles] = useState([]);
     const numColumns = 3;
@@ -29,193 +29,14 @@ const Recent = ({ route }) => {
         setVisible(false);
     }
 
+
+    // Fetch files from Realm on component mount
     useFocusEffect(
         useCallback(() => {
-            const data = realm.objects("Document").filtered("deleted = 0");
+            const data = realm.objects("Document").filtered("starred == true AND deleted == 0");
             setFiles([...data]);
         }, [])
     );
-
-
-    // Fetch files from Realm on component mount
-    React.useEffect(() => {
-
-    }, []);
-
-    const openCamera = () => {
-        launchCamera(
-            {
-                mediaType: "photo",
-                cameraType: "back",
-                saveToPhotos: true,
-            },
-            (response) => {
-                if (response.didCancel) {
-                    console.log("User cancelled camera operation.");
-                } else if (response.errorCode) {
-                    console.log("Camera error: ", response.errorMessage);
-                } else {
-                    // Add the captured image URI to the array
-                    const newImageUri = response.assets[0]?.uri;
-                    if (newImageUri) {
-                        setImageUris((prevUris) => [...prevUris, newImageUri]);
-                        console.log("Captured Image URI: ", newImageUri);
-                    } else {
-                        console.warn("No URI found for the captured image.");
-                    }
-                }
-            }
-        );
-    };
-
-    const saveFiles = async () => {
-        // Show options (checkbox dialog)
-        const options = ["Save as JPG", "Save as PDF"];
-        Alert.alert(
-            "Save Options",
-            "Choose file formats to save",
-            options.map((option, index) => ({
-                text: option,
-                onPress: () => handleSaveOption(index),
-            }))
-        );
-    };
-
-    const handleSaveOption = async (index) => {
-        if (imageUris.length === 0) {
-            Alert.alert("Error", "No images available to save.");
-            return;
-        }
-
-        const now = new Date();
-        const createdAt = now.toISOString();
-        const createdDate = now.toLocaleDateString();
-        const createdTime = now.toLocaleTimeString();
-
-        if (index === 0) {
-            console.warn(imageUris);
-            // Save as JPG
-            imageUris.forEach((uri, idx) => {
-                const fileName = `Image_${new Date().getTime()}.jpg`;
-                realm.write(() => {
-                    realm.create("Document", {
-                        id: parseInt(`${new Date().getTime()}`),
-                        name: fileName,
-                        filePath: uri,
-                        createdAt,
-                        createdDate,
-                        createdTime,
-                        updatedAt: createdAt,
-                        updatedDate: createdDate,
-                        updatedTime: createdTime,
-                        lastOpened: "",
-                        deleted: 0,
-                        starred: false,
-                    });
-                });
-            });
-        } else if (index === 1) {
-            try {
-                // Save as PDF
-                const pdfUri = await generatePDF(imageUris); // Pass the `imageUris` array here
-                const fileName = `Doc_${new Date().getTime()}.pdf`;
-                realm.write(() => {
-                    realm.create("Document", {
-                        id: parseInt(`${new Date().getTime()}`),
-                        name: fileName,
-                        filePath: pdfUri,
-                        createdAt,
-                        createdDate,
-                        createdTime,
-                        updatedAt: createdAt,
-                        updatedDate: createdDate,
-                        updatedTime: createdTime,
-                        lastOpened: "",
-                        deleted: 0,
-                        starred: false,
-                    });
-                });
-            } catch (error) {
-                console.error("Error saving PDF:", error);
-                Alert.alert("Error", "Failed to generate PDF.");
-            }
-        }
-
-        setFiles([...realm.objects("Document").filtered("deleted = 0")]); // Refresh the files list
-        setImageUris([]); // Clear captured image URIs
-    };
-
-    const generatePDF = async (imageUris) => {
-        console.log("Generating PDF with image URIs:", imageUris);
-
-        if (!Array.isArray(imageUris) || imageUris.length === 0) {
-            throw new Error("No valid images to create PDF.");
-        }
-
-        const pdfPath = `${RNFS.DocumentDirectoryPath}/document_${date}.pdf`;
-        console.log("PDF Path:", pdfPath);
-
-        try {
-            const pdfDoc = await PDFDocument.create();
-            console.log("PDF Document created.");
-
-            for (const imageUri of imageUris) {
-                console.log("Processing image URI:", imageUri);
-
-                const filePath = imageUri.startsWith("file://") ? imageUri.replace("file://", "") : imageUri;
-
-                try {
-                    const imageBytes = await RNFS.readFile(filePath, "base64");
-                    console.log("Image bytes read successfully.");
-
-                    const extension = filePath.split(".").pop()?.toLowerCase();
-                    let embeddedImage;
-                    if (extension === "jpg" || extension === "jpeg") {
-                        console.log("Embedding JPG image.");
-                        embeddedImage = await pdfDoc.embedJpg(imageBytes);
-                    } else if (extension === "png") {
-                        console.log("Embedding PNG image.");
-                        embeddedImage = await pdfDoc.embedPng(imageBytes);
-                    } else {
-                        console.warn(`Unsupported image format: ${filePath}`);
-                        continue;
-                    }
-
-                    const page = pdfDoc.addPage([embeddedImage.width, embeddedImage.height]);
-                    page.drawImage(embeddedImage, {
-                        x: 0,
-                        y: 0,
-                        width: embeddedImage.width,
-                        height: embeddedImage.height,
-                    });
-                    console.log("Image added to PDF page.");
-                } catch (imageError) {
-                    console.error(`Error embedding image: ${filePath}`, imageError);
-                    throw new Error("Failed to process an image.");
-                }
-            }
-
-            const pdfBytes = await pdfDoc.save();
-            console.log("PDF document saved to bytes.");
-
-            // Convert to Base64 without Buffer
-            const pdfBase64 = btoa(
-                new Uint8Array(pdfBytes).reduce(
-                    (data, byte) => data + String.fromCharCode(byte),
-                    ""
-                )
-            );
-            console.log("PDF converted to base64.");
-
-            await RNFS.writeFile(pdfPath, pdfBase64, "base64");
-            console.log("PDF written to file system at:", pdfPath);
-
-            return `file://${pdfPath}`;
-        } catch (error) {
-            console.error("Error during PDF generation:", error);
-            throw new Error("Failed to generate PDF.");
-        }
-    };
 
     function handleOptions(item) {
         setSelectedItem(item);
@@ -255,7 +76,7 @@ const Recent = ({ route }) => {
             });
 
             // Refresh the files list
-            setFiles([...realm.objects("Document").filtered("deleted = 0")]);
+            setFiles([...realm.objects("Document").filtered("starred == true AND deleted == 0")]);
             setVisible(false);
             Alert.alert("Success", "Document duplicated successfully.");
         } catch (error) {
@@ -271,15 +92,10 @@ const Recent = ({ route }) => {
                 // Find the document with the given id
                 const document = realm.objectForPrimaryKey("Document", id);
                 // If the document exists, update the `deleted` property
-                if (document.starred === true) {
+                if (document) {
                     document.starred = false;
-                    setFiles([...realm.objects("Document").filtered("deleted = 0")]); // Refresh the files list
+                    setFiles([...realm.objects("Document").filtered("starred == true AND deleted == 0")]); // Refresh the files list
                     Alert.alert("Success", "File is removed from your favourites.");
-                    setVisible(false);
-                } else if (document.starred === false) {
-                    document.starred = true;
-                    setFiles([...realm.objects("Document").filtered("deleted = 0")]); // Refresh the files list
-                    Alert.alert("Success", "File is added to your favourites.");
                     setVisible(false);
                 } else {
                     console.warn(`Document with id ${id} not found.`);
@@ -291,43 +107,25 @@ const Recent = ({ route }) => {
     };
 
     const handleDelete = (id) => {
-        // Show confirmation dialog before deleting
-        Alert.alert(
-            "Delete Confirmation",
-            "Are you sure you want to delete this file?",
-            [
-                {
-                    text: "Cancel",
-                    style: "cancel", // Makes this button a "cancel" button
-                },
-                {
-                    text: "Delete",
-                    style: "destructive", // For visual indication of a destructive action
-                    onPress: () => {
-                        try {
-                            // Start a Realm write transaction
-                            realm.write(() => {
-                                // Find the document with the given id
-                                const document = realm.objectForPrimaryKey("Document", id);
-                                if (document) {
-                                    document.deleted = 1;
-                                    setFiles([...realm.objects("Document").filtered("deleted = 0")]);
-                                    Alert.alert("Success", "File has been deleted.");                                  
-                                    setVisible(false);
-                                } else {
-                                    console.warn(`Document with id ${id} not found.`);
-                                }
-                            });
-                        } catch (error) {
-                            console.error("Error deleting document:", error);
-                            Alert.alert("Error", "An error occurred while deleting the file.");
-                        }
-                    },
-                },
-            ],
-            { cancelable: true } // Allows the user to dismiss the dialog by tapping outside
-        );
+        try {
+            // Start a Realm write transaction
+            realm.write(() => {
+                // Find the document with the given id
+                const document = realm.objectForPrimaryKey("Document", id);
+                // If the document exists, update the `deleted` property
+                if (document) {
+                    document.deleted = 1;
+                    setFiles([...realm.objects("Document").filtered("starred == true AND deleted == 0")]); // Refresh the files list
+                    setVisible(false);
+                } else {
+                    console.warn(`Document with id ${id} not found.`);
+                }
+            });
+        } catch (error) {
+            console.error("Error updating document:", error);
+        }
     };
+
 
 
 
@@ -384,8 +182,8 @@ const Recent = ({ route }) => {
                                 <Text style={styles.modalText}>Set Password</Text>
                             </Pressable>
                             <Pressable key='Star' onPress={() => handleStar(selectedItem.id)} style={styles.modalPressable} >
-                                <FontAwesome name={selectedItem.starred === true ? 'star' : 'star-o'} size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>{selectedItem.starred === true ? 'Unstar' : 'Star'}</Text>
+                                <FontAwesome name='star' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Unstar</Text>
                             </Pressable>
                             <Pressable key='Rename' onPress={() => handlePress('Rename')} style={styles.modalPressable} >
                                 <MaterialCommunityIcons name='rename-box' size={24} color='black' style={{ width: 30 }} />
@@ -425,30 +223,6 @@ const Recent = ({ route }) => {
                     renderItem={renderFile}
                 />
             )}
-
-
-
-            {imageUris.length > 0 && (
-                <View>
-                    <Text>Captured Images:</Text>
-                    <FlatList
-                        data={imageUris}
-                        horizontal
-                        keyExtractor={(uri, idx) => idx.toString()}
-                        renderItem={({ item }) => (
-                            <Image source={{ uri: item }} style={styles.imagePreview} />
-                        )}
-                    />
-                    <TouchableOpacity onPress={saveFiles} style={styles.saveBtn}>
-                        <Text style={styles.saveText}>Save</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            <TouchableOpacity onPress={openCamera} style={styles.cameraBtn}>
-                <Text style={styles.cameraTxt}>Scan</Text>
-                <Ionicons name="camera-outline" size={30} color="white" />
-            </TouchableOpacity>
         </View>
     );
 };
@@ -550,11 +324,12 @@ const styles = StyleSheet.create({
     },
     modalPressable: {
         flexDirection: 'row',
-        padding: 10, width: '100%',
+        padding: 10, 
+        width: '100%',
         gap: 15,
         justifyContent: 'flex-start',
         alignItems: 'center'
     }
 });
 
-export default Recent;
+export default Starred;

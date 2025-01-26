@@ -4,18 +4,9 @@ import { Text, View, TouchableOpacity } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { RadioButton } from 'react-native-paper';
 import Recent from '../screens/Recent';
+import Starred from '../screens/Starred';
 
 const Tab = createMaterialTopTabNavigator();
-
-
-
-function StarredScreen() {
-    return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text>Starred Screen</Text>
-        </View>
-    );
-}
 
 // Custom Tab Bar
 function CustomTabBar({ state, descriptors, navigation }) {
@@ -105,9 +96,9 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
 const TopTabs = () => {
     return (
-        <Tab.Navigator tabBar={(props) => <CustomTabBar {...props} />}>
+        <Tab.Navigator tabBar={(props) => <CustomTabBar {...props} />} >
             <Tab.Screen name="Recent" component={Recent} />
-            <Tab.Screen name="Starred" component={StarredScreen} />
+            <Tab.Screen name="Starred" component={Starred} />
         </Tab.Navigator>
     );
 };
