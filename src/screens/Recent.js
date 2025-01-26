@@ -4,37 +4,16 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import AntDesign from "react-native-vector-icons/AntDesign";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import Foundation from "react-native-vector-icons/Foundation";
 import SimpleLineIcons from "react-native-vector-icons/SimpleLineIcons";
 import { launchCamera } from "react-native-image-picker";
-import Realm from "realm";
+import realm from "../db/realmSchema";
 import { PDFDocument } from "pdf-lib";
 import RNFS from "react-native-fs";
 import FileViewer from "react-native-file-viewer";
 
-// Initialize Realm Schema
-const realm = new Realm({
-    schema: [
-        {
-            name: "Document",
-            primaryKey: "id",
-            properties: {
-                id: "int",
-                name: "string",
-                filePath: "string",
-                createdAt: "string",
-                createdDate: "string",
-                createdTime: "string",
-                updatedAt: "string",
-                updatedDate: "string",
-                updatedTime: "string",
-                lastOpened: "string",
-                deleted: "int",
-                starred: { type: "bool", default: false },
-            },
-        },
-    ],
-});
+const date = Date.now();
 
 const Recent = ({ route }) => {
     const [imageUris, setImageUris] = useState([]);
@@ -43,26 +22,16 @@ const Recent = ({ route }) => {
     const { viewData = 'list' } = route.params || {};
 
     const [visible, setVisible] = useState(false);
-    const [selectedItem, setSelectedItem] = useState("Select an item");
-    const items = [
-        { icon: "page-export-pdf", text: "Export PDF" },
-        { icon: "compress", text: "Compress PDF" },
-        { icon: "send", text: "Send a Copy" },
-        { icon: "lock", text: "Set Password" },
-        { icon: "star-o", text: "Star" },
-        { icon: "rename-box", text: "Rename" },
-        { icon: "copy", text: "Duplicate" },
-        { icon: "delete-outline", text: "Delete" },
-    ];
+    const [selectedItem, setSelectedItem] = useState("");
 
-    const handleSelect = (item) => {
-        setSelectedItem(item);
+    const handlePress = () => {
         setVisible(false);
-    };
+    }
+
 
     // Fetch files from Realm on component mount
     React.useEffect(() => {
-        const data = realm.objects("Document");
+        const data = realm.objects("Document").filtered("deleted = 0");
         setFiles([...data]);
     }, []);
 
@@ -94,7 +63,7 @@ const Recent = ({ route }) => {
 
     const saveFiles = async () => {
         // Show options (checkbox dialog)
-        const options = ["Save as PNG", "Save as PDF"];
+        const options = ["Save as JPG", "Save as PDF"];
         Alert.alert(
             "Save Options",
             "Choose file formats to save",
@@ -117,12 +86,13 @@ const Recent = ({ route }) => {
         const createdTime = now.toLocaleTimeString();
 
         if (index === 0) {
-            // Save as PNG
+            console.warn(imageUris);
+            // Save as JPG
             imageUris.forEach((uri, idx) => {
-                const fileName = `image_${Date.now()}_${idx + 1}.png`;
+                const fileName = `document_${new Date().getTime()}.jpg`;
                 realm.write(() => {
                     realm.create("Document", {
-                        id: Date.now() + idx,
+                        id: parseInt(`${new Date().getTime()}`),
                         name: fileName,
                         filePath: uri,
                         createdAt,
@@ -141,10 +111,10 @@ const Recent = ({ route }) => {
             try {
                 // Save as PDF
                 const pdfUri = await generatePDF(imageUris); // Pass the `imageUris` array here
-                const fileName = `document_${Date.now()}.pdf`;
+                const fileName = `document_${new Date().getTime()}.pdf`;
                 realm.write(() => {
                     realm.create("Document", {
-                        id: Date.now(),
+                        id: parseInt(`${new Date().getTime()}`),
                         name: fileName,
                         filePath: pdfUri,
                         createdAt,
@@ -164,7 +134,7 @@ const Recent = ({ route }) => {
             }
         }
 
-        setFiles([...realm.objects("Document")]); // Refresh the files list
+        setFiles([...realm.objects("Document").filtered("deleted = 0")]); // Refresh the files list
         setImageUris([]); // Clear captured image URIs
     };
 
@@ -175,7 +145,7 @@ const Recent = ({ route }) => {
             throw new Error("No valid images to create PDF.");
         }
 
-        const pdfPath = `${RNFS.DocumentDirectoryPath}/document_${Date.now()}.pdf`;
+        const pdfPath = `${RNFS.DocumentDirectoryPath}/document_${date}.pdf`;
         console.log("PDF Path:", pdfPath);
 
         try {
@@ -240,6 +210,75 @@ const Recent = ({ route }) => {
         }
     };
 
+    function handleOptions(item) {
+        setSelectedItem(item);
+        setVisible(true);
+
+    }
+
+    const handleDuplicate = (id) => {
+        try {
+            // Find the document with the given ID
+            const document = realm.objectForPrimaryKey("Document", id);
+            if (!document) {
+                console.warn(`Document with ID ${id} not found.`);
+                Alert.alert("Error", "The document could not be found.");
+                return;
+            }
+
+            // Generate a new unique ID for the duplicate
+            const newId = new Date().getTime();
+
+            // Create the duplicate document
+            realm.write(() => {
+                realm.create("Document", {
+                    id: parseInt(newId),
+                    name: `${document.name} (Copy)`,
+                    filePath: document.filePath,
+                    createdAt: new Date().toISOString(),
+                    createdDate: new Date().toLocaleDateString(),
+                    createdTime: new Date().toLocaleTimeString(),
+                    updatedAt: new Date().toISOString(),
+                    updatedDate: new Date().toLocaleDateString(),
+                    updatedTime: new Date().toLocaleTimeString(),
+                    lastOpened: null,
+                    deleted: 0,
+                    starred: document.starred,
+                });
+            });
+
+            // Refresh the files list
+            setFiles([...realm.objects("Document").filtered("deleted = 0")]);
+            setVisible(false);
+            Alert.alert("Success", "Document duplicated successfully.");
+        } catch (error) {
+            console.error("Error duplicating document:", error);
+            Alert.alert("Error", "Failed to duplicate the document.");
+        }
+    };
+
+
+    const handleDelete = (id) => {
+        try {
+            // Start a Realm write transaction
+            realm.write(() => {
+                // Find the document with the given id
+                const document = realm.objectForPrimaryKey("Document", id);
+                // If the document exists, update the `deleted` property
+                if (document) {
+                    document.deleted = 1;
+                    setFiles([...realm.objects("Document").filtered("deleted = 0")]); // Refresh the files list
+                    setVisible(false);
+                } else {
+                    console.warn(`Document with id ${id} not found.`);
+                }
+            });
+        } catch (error) {
+            console.error("Error updating document:", error);
+        }
+    };
+
+
 
     const renderFile = ({ item }) => {
         const handleFilePress = async () => {
@@ -253,17 +292,17 @@ const Recent = ({ route }) => {
             }
         };
         return (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: "#ccc" }}>
+            <View style={{ flexDirection: viewData === 'grid' ? 'column' : 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: viewData === 'grid' ? 0 : 1, borderColor: "#ccc" }}>
                 <TouchableOpacity style={viewData === 'grid' ? styles.gridItems : styles.listItems} onPress={handleFilePress}>
                     <AntDesign
                         name={item.name.endsWith(".pdf") ? "pdffile1" : "jpgfile1"}
-                        size={40}
+                        size={viewData === 'grid' ? 30 : 40}
                         color={item.name.endsWith(".pdf") ? "red" : "#014955"}
                     />
-                    <Text style={styles.fileName}>{item.name}</Text>
+                    <Text>{item.name.substring(0, 30)}{item.name.length > 30 ? item.name.endsWith(".pdf") ? '......pdf' : '......jpg' : ''}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setVisible(true)} style={{ position: 'relative' }}>
-                    <SimpleLineIcons name="options-vertical" size={20} color="#014955" style={{ marginLeft: 10 }} />
+                <TouchableOpacity onPress={() => handleOptions(item)} style={{ position: 'relative' }}>
+                    <SimpleLineIcons name={viewData === "grid" ? 'options' : "options-vertical"} size={20} color="#014955" style={{ marginLeft: 10 }} />
                     <Modal visible={visible} transparent animationType="slide">
                         <TouchableOpacity
                             style={styles.overlay}
@@ -272,24 +311,40 @@ const Recent = ({ route }) => {
                         <View style={styles.dropdown}>
                             <View style={{ borderBottomWidth: 1, borderColor: "#ccc", alignItems: 'flex-start', justifyContent: 'center', height: 40, paddingBottom: 8, marginBottom: 10 }}>
                                 <AntDesign name="close" size={25} color="#014955" style={{ marginLeft: 10 }} onPress={() => setVisible(false)} />
+                                <Text>{selectedItem.id} </Text>
                             </View>
-                            {items.map(option => (
-                                <Pressable
-                                    key={option.text}
-                                    onPress={() => handlePress(option.text)}
-                                    style={{ flexDirection: 'row', padding: 10, width: '100%', gap: 15, justifyContent: 'flex-start', alignItems: 'center' }}
-                                >
-                                    {option.icon === 'MaterialCommunityIcons' ? (
-                                        <MaterialCommunityIcons name={option.icon} size={24} color='black' style={{ width: 30 }} />
-                                    ) : option.icon === 'Foundation' ? (
-                                        <Foundation name={option.icon} size={24} color='black' style={{ width: 30 }} />
-                                    ) : (
-                                        <FontAwesome name={option.icon} size={24} color='black' style={{ width: 30 }} />
-                                    )}
-
-                                    <Text style={styles.modalText}>{option.text}</Text>
-                                </Pressable>
-                            ))}
+                            <Pressable key='Export PDF' onPress={() => handlePress('Export PDF')} style={styles.modalPressable} >
+                                <Foundation name='page-export-pdf' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Export PDF</Text>
+                            </Pressable>
+                            <Pressable key='Compress PDF' onPress={() => handlePress('Compress PDF')} style={styles.modalPressable} >
+                                <MaterialIcons name='compress' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Compress PDF</Text>
+                            </Pressable>
+                            <Pressable key='Send' onPress={() => handlePress('Send')} style={styles.modalPressable} >
+                                <MaterialCommunityIcons name='email-send-outline' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Send</Text>
+                            </Pressable>
+                            <Pressable key='Lock' onPress={() => handlePress('Lock')} style={styles.modalPressable} >
+                                <MaterialIcons name='password' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Set Password</Text>
+                            </Pressable>
+                            <Pressable key='Star' onPress={() => handlePress('Star')} style={styles.modalPressable} >
+                                <FontAwesome name='star-o' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Star</Text>
+                            </Pressable>
+                            <Pressable key='Rename' onPress={() => handlePress('Rename')} style={styles.modalPressable} >
+                                <MaterialCommunityIcons name='rename-box' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Rename</Text>
+                            </Pressable>
+                            <Pressable key='Duplicate' onPress={() => handleDuplicate(selectedItem.id)} style={styles.modalPressable} >
+                                <MaterialCommunityIcons name='content-duplicate' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Duplicate</Text>
+                            </Pressable>
+                            <Pressable key='Delete' onPress={() => handleDelete(selectedItem.id)} style={styles.modalPressable} >
+                                <AntDesign name='delete' size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>Delete</Text>
+                            </Pressable>
                         </View>
                     </Modal>
                 </TouchableOpacity>
@@ -348,17 +403,19 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
+        maxWidth: '100%'
     },
     gridRow: {
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
     },
     gridItems: {
-        flex: 1,
         margin: 10,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#f0f0f0",
         padding: 10,
+        height: 120,
+        width: 110,
         borderRadius: 10,
         borderWidth: .2,
         gap: 10
@@ -369,9 +426,6 @@ const styles = StyleSheet.create({
         padding: 10,
         justifyContent: 'flex-start',
         gap: 20
-    },
-    fileName: {
-        fontSize: 18
     },
     icon: {
         marginRight: 10,
@@ -439,8 +493,14 @@ const styles = StyleSheet.create({
     },
     modalText: {
         fontSize: 16
+    },
+    modalPressable: {
+        flexDirection: 'row',
+        padding: 10, width: '100%',
+        gap: 15,
+        justifyContent: 'flex-start',
+        alignItems: 'center'
     }
 });
 
 export default Recent;
-
