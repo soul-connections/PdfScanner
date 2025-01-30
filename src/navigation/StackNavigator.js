@@ -2,19 +2,18 @@
 
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import TopTabs from "./TopTabs";
-// import CameraScreen from '../screens/CameraScreen';
-// import PDFScreen from '../screens/PdfScreen';
-// import RecentFilesScreen from '../screens/RecentScreen';
+import PDFEditorScreen from '../editor/PdfEditorScreen';
+import ImageCapture from '../scanner/ImageCapture';
 
 const Stack = createNativeStackNavigator();
 
 const StackNavigator = () => { 
     return (
-        <Stack.Navigator>
+        <Stack.Navigator >
             <Stack.Screen name="HomeScreen" component={TopTabs} options={{ headerShown: false }} />
-            {/* <Stack.Screen name="CameraScreen" component={CameraScreen} />
-            <Stack.Screen name="PDFScreen" component={PDFScreen} />
-            <Stack.Screen name="RecentFilesScreen" component={RecentFilesScreen} /> */}
+            <Stack.Screen name="PdfEditor" component={PDFEditorScreen} />
+            <Stack.Screen name="Camera" component={ImageCapture} options={{ headerShown: false } } />
+
         </Stack.Navigator>
     );
 }

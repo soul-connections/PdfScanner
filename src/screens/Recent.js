@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { Text, View, TouchableOpacity, Image, StyleSheet, FlatList, Alert, Modal, Pressable } from "react-native";
+import { Text, View, TouchableOpacity, StyleSheet, FlatList, Alert, Modal, Pressable, Image } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import AntDesign from "react-native-vector-icons/AntDesign";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -7,21 +7,20 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import Foundation from "react-native-vector-icons/Foundation";
 import SimpleLineIcons from "react-native-vector-icons/SimpleLineIcons";
-import { launchCamera } from "react-native-image-picker";
 import realm from "../db/realmSchema";
 import { PDFDocument } from "pdf-lib";
 import RNFS from "react-native-fs";
 import FileViewer from "react-native-file-viewer";
 import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import DocumentScanner from "react-native-document-scanner-plugin";
 
 const date = Date.now();
 
-const Recent = ({ route }) => {
-    const [imageUris, setImageUris] = useState([]);
+const Recent = ({ route, navigation }) => {
     const [files, setFiles] = useState([]);
     const numColumns = 3;
     const { viewData = 'list' } = route.params || {};
-
     const [visible, setVisible] = useState(false);
     const [selectedItem, setSelectedItem] = useState("");
 
@@ -36,114 +35,25 @@ const Recent = ({ route }) => {
         }, [])
     );
 
+    const [scannedImage, setScannedImage] = React.useState(null);
 
-    // Fetch files from Realm on component mount
-    React.useEffect(() => {
-
-    }, []);
-
-    const openCamera = () => {
-        launchCamera(
-            {
-                mediaType: "photo",
-                cameraType: "back",
-                saveToPhotos: true,
-            },
-            (response) => {
-                if (response.didCancel) {
-                    console.log("User cancelled camera operation.");
-                } else if (response.errorCode) {
-                    console.log("Camera error: ", response.errorMessage);
-                } else {
-                    // Add the captured image URI to the array
-                    const newImageUri = response.assets[0]?.uri;
-                    if (newImageUri) {
-                        setImageUris((prevUris) => [...prevUris, newImageUri]);
-                        console.log("Captured Image URI: ", newImageUri);
-                    } else {
-                        console.warn("No URI found for the captured image.");
-                    }
-                }
-            }
-        );
-    };
-
-    const saveFiles = async () => {
-        // Show options (checkbox dialog)
-        const options = ["Save as JPG", "Save as PDF"];
-        Alert.alert(
-            "Save Options",
-            "Choose file formats to save",
-            options.map((option, index) => ({
-                text: option,
-                onPress: () => handleSaveOption(index),
-            }))
-        );
-    };
-
-    const handleSaveOption = async (index) => {
-        if (imageUris.length === 0) {
-            Alert.alert("Error", "No images available to save.");
-            return;
-        }
-
-        const now = new Date();
-        const createdAt = now.toISOString();
-        const createdDate = now.toLocaleDateString();
-        const createdTime = now.toLocaleTimeString();
-
-        if (index === 0) {
-            console.warn(imageUris);
-            // Save as JPG
-            imageUris.forEach((uri, idx) => {
-                const fileName = `Image_${new Date().getTime()}.jpg`;
-                realm.write(() => {
-                    realm.create("Document", {
-                        id: parseInt(`${new Date().getTime()}`),
-                        name: fileName,
-                        filePath: uri,
-                        createdAt,
-                        createdDate,
-                        createdTime,
-                        updatedAt: createdAt,
-                        updatedDate: createdDate,
-                        updatedTime: createdTime,
-                        lastOpened: "",
-                        deleted: 0,
-                        starred: false,
-                    });
-                });
+    const scanDocument = async () => {
+        try {
+            const { scannedImages } = await DocumentScanner.scanDocument({
+                quality: 1, // Quality of the output image (0-1)
+                returnBase64: false, // Set to true if you want the image as a Base64 string
             });
-        } else if (index === 1) {
-            try {
-                // Save as PDF
-                const pdfUri = await generatePDF(imageUris); // Pass the `imageUris` array here
-                const fileName = `Doc_${new Date().getTime()}.pdf`;
-                realm.write(() => {
-                    realm.create("Document", {
-                        id: parseInt(`${new Date().getTime()}`),
-                        name: fileName,
-                        filePath: pdfUri,
-                        createdAt,
-                        createdDate,
-                        createdTime,
-                        updatedAt: createdAt,
-                        updatedDate: createdDate,
-                        updatedTime: createdTime,
-                        lastOpened: "",
-                        deleted: 0,
-                        starred: false,
-                    });
-                });
-            } catch (error) {
-                console.error("Error saving PDF:", error);
-                Alert.alert("Error", "Failed to generate PDF.");
-            }
-        }
 
-        setFiles([...realm.objects("Document").filtered("deleted = 0")]); // Refresh the files list
-        setImageUris([]); // Clear captured image URIs
+            if (scannedImages.length > 0) {
+                // Append scanned image URIs to the imageUris state
+                setImageUris((prevUris) => [...prevUris, ...scannedImages]);
+                console.log("Scanned Image URIs: ", scannedImages);
+            }
+        } catch (error) {
+            console.log("Document scan failed: ", error);
+        }
     };
+
 
     const generatePDF = async (imageUris) => {
         console.log("Generating PDF with image URIs:", imageUris);
@@ -223,6 +133,12 @@ const Recent = ({ route }) => {
 
     }
 
+    const handleEdit = async (item) => {
+        setVisible(false);
+        await AsyncStorage.setItem("pdfUri", item.filePath);
+        navigation.navigate("PdfEditor");
+    };
+
     const handleDuplicate = (id) => {
         try {
             // Find the document with the given ID
@@ -291,6 +207,7 @@ const Recent = ({ route }) => {
     };
 
     const handleDelete = (id) => {
+        setVisible(false);
         // Show confirmation dialog before deleting
         Alert.alert(
             "Delete Confirmation",
@@ -312,8 +229,7 @@ const Recent = ({ route }) => {
                                 if (document) {
                                     document.deleted = 1;
                                     setFiles([...realm.objects("Document").filtered("deleted = 0")]);
-                                    Alert.alert("Success", "File has been deleted.");                                  
-                                    setVisible(false);
+                                    Alert.alert("Success", "File has been deleted.");
                                 } else {
                                     console.warn(`Document with id ${id} not found.`);
                                 }
@@ -345,12 +261,16 @@ const Recent = ({ route }) => {
         return (
             <View style={{ flexDirection: viewData === 'grid' ? 'column' : 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: viewData === 'grid' ? 0 : 1, borderColor: "#ccc" }}>
                 <TouchableOpacity style={viewData === 'grid' ? styles.gridItems : styles.listItems} onPress={handleFilePress}>
-                    <AntDesign
+                    <Image
+                        source={{ uri: item.filePath || 'default_thumbnail_url_here' }} // Use a default thumbnail if none provided
+                        style={viewData === 'grid' ? {width: 100, height: 100, borderRadius: 5} : {width: 40, height: 40, borderRadius: 5}} // Style the thumbnail as needed
+                    />
+                    {/* <AntDesign
                         name={item.name.endsWith(".pdf") ? "pdffile1" : "jpgfile1"}
                         size={viewData === 'grid' ? 30 : 40}
                         color={item.name.endsWith(".pdf") ? "red" : "#014955"}
-                    />
-                    <Text>{item.name.substring(0, 30)}{item.name.length > 30 ? item.name.endsWith(".pdf") ? '.. .pdf' : '.. .jpg' : ''}</Text>
+                    /> */}
+                    <Text>{item.name.substring(0, 20)}...</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleOptions(item)} style={{ position: 'relative' }}>
                     <SimpleLineIcons name={viewData === "grid" ? 'options' : "options-vertical"} size={20} color="#014955" style={{ marginLeft: 10 }} />
@@ -359,30 +279,34 @@ const Recent = ({ route }) => {
                             style={styles.overlay}
                             onPress={() => setVisible(false)}
                         />
-                        <View style={styles.dropdown}>
+                        <View style={[styles.dropdown]}>
                             <View style={{ borderBottomWidth: 1, borderColor: "#ccc", alignItems: 'flex-start', justifyContent: 'center', height: 40, paddingBottom: 8, marginBottom: 10 }}>
                                 <AntDesign name="close" size={25} color="#014955" style={{ marginLeft: 10 }} onPress={() => setVisible(false)} />
                             </View>
-                            <Pressable key='Edit' onPress={() => handlePress('Edit')} style={styles.modalPressable} >
-                                <FontAwesome name='edit' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Edit PDF</Text>
-                            </Pressable>
-                            <Pressable key='Export PDF' onPress={() => handlePress('Export PDF')} style={styles.modalPressable} >
-                                <Foundation name='page-export-pdf' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Export PDF</Text>
-                            </Pressable>
-                            <Pressable key='Compress PDF' onPress={() => handlePress('Compress PDF')} style={styles.modalPressable} >
-                                <MaterialIcons name='compress' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Compress PDF</Text>
-                            </Pressable>
+                            {selectedItem && selectedItem.name.endsWith('.pdf') ? (<>
+                                <Pressable key='Edit' onPress={() => handleEdit(selectedItem)} style={styles.modalPressable} >
+                                    <FontAwesome name='edit' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Edit PDF</Text>
+                                </Pressable>
+                                <Pressable key='Compress PDF' onPress={() => handlePress('Compress PDF')} style={styles.modalPressable} >
+                                    <MaterialIcons name='compress' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Compress PDF</Text>
+                                </Pressable>
+                                <Pressable key='Lock' onPress={() => handlePress('Lock')} style={styles.modalPressable} >
+                                    <MaterialIcons name='password' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Set Password</Text>
+                                </Pressable>
+                            </>) : ''}
                             <Pressable key='Send' onPress={() => handlePress('Send')} style={styles.modalPressable} >
                                 <MaterialCommunityIcons name='email-send-outline' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Send</Text>
+                                <Text style={styles.modalText}>Share</Text>
                             </Pressable>
-                            <Pressable key='Lock' onPress={() => handlePress('Lock')} style={styles.modalPressable} >
-                                <MaterialIcons name='password' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Set Password</Text>
-                            </Pressable>
+                            {selectedItem && selectedItem.name.endsWith('.jpg') ? (
+                                <Pressable key='Export PDF' onPress={() => handlePress('Export PDF')} style={styles.modalPressable} >
+                                    <Foundation name='page-export-pdf' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Convert to PDF</Text>
+                                </Pressable>
+                            ) : ''}
                             <Pressable key='Star' onPress={() => handleStar(selectedItem.id)} style={styles.modalPressable} >
                                 <FontAwesome name={selectedItem.starred === true ? 'star' : 'star-o'} size={24} color='black' style={{ width: 30 }} />
                                 <Text style={styles.modalText}>{selectedItem.starred === true ? 'Unstar' : 'Star'}</Text>
@@ -426,26 +350,7 @@ const Recent = ({ route }) => {
                 />
             )}
 
-
-
-            {imageUris.length > 0 && (
-                <View>
-                    <Text>Captured Images:</Text>
-                    <FlatList
-                        data={imageUris}
-                        horizontal
-                        keyExtractor={(uri, idx) => idx.toString()}
-                        renderItem={({ item }) => (
-                            <Image source={{ uri: item }} style={styles.imagePreview} />
-                        )}
-                    />
-                    <TouchableOpacity onPress={saveFiles} style={styles.saveBtn}>
-                        <Text style={styles.saveText}>Save</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-
-            <TouchableOpacity onPress={openCamera} style={styles.cameraBtn}>
+            <TouchableOpacity style={styles.cameraBtn} onPress={() => navigation.navigate('Camera')} >
                 <Text style={styles.cameraTxt}>Scan</Text>
                 <Ionicons name="camera-outline" size={30} color="white" />
             </TouchableOpacity>
@@ -468,7 +373,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         backgroundColor: "#f0f0f0",
         padding: 10,
-        height: 120,
+        height: 170,
         width: 110,
         borderRadius: 10,
         borderWidth: .2,
@@ -535,9 +440,9 @@ const styles = StyleSheet.create({
         backgroundColor: "#fff",
         borderRadius: 15,
         padding: 10,
-        height: '52%',
         marginLeft: 2,
-        marginRight: 2
+        marginRight: 2,
+        paddingBottom: '10%'
     },
     dropdownItem: {
         padding: 10,
@@ -550,7 +455,8 @@ const styles = StyleSheet.create({
     },
     modalPressable: {
         flexDirection: 'row',
-        padding: 10, width: '100%',
+        padding: 10,
+        width: '100%',
         gap: 15,
         justifyContent: 'flex-start',
         alignItems: 'center'

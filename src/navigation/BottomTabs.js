@@ -4,6 +4,7 @@ import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
+import { useNavigationState } from "@react-navigation/native";
 import { Text, View, TouchableOpacity } from 'react-native';
 import StackNavigator from "./StackNavigator";
 import AccountsDrawer from "./AccountsDrawer";
@@ -26,11 +27,24 @@ function SettingScreen() {
   )
 }
 
+
 const BottomTabs = () => {
+  const navigationState = useNavigationState((state) => state);
+
+  // Check if the current screen inside StackNavigator is "Camera"
+  let isCameraScreen = false;
+  if (navigationState) {
+    const homeRoute = navigationState.routes.find((r) => r.name === "Home");
+    if (homeRoute && homeRoute.state && homeRoute.state.index !== undefined) {
+      const currentScreen = homeRoute.state.routes[homeRoute.state.index].name;
+      isCameraScreen = currentScreen === "Camera";
+    }
+  }
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: true,
+        headerShown: !isCameraScreen, // Hide header only when Camera is active
         headerStyle: {
           backgroundColor: "#014955",
           height: 130,
@@ -47,24 +61,17 @@ const BottomTabs = () => {
         ),
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-
-          if (route.name === "Home") {
-            iconName = focused ? "home" : "home";
-          } else if (route.name === "Files") {
-            iconName = focused ? "folder" : "folder";
-          } else if (route.name === "Settings") {
-            iconName = focused ? "settings-sharp" : "settings-sharp";
-          }
-
-          // Return the icon component
+          if (route.name === "Home") iconName = "home";
+          else if (route.name === "Files") iconName = "folder";
+          else if (route.name === "Settings") iconName = "settings-sharp";
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: "white",
         tabBarInactiveTintColor: "grey",
-        tabBarStyle: {
+        tabBarStyle: isCameraScreen ? { display: "none" } : {
           backgroundColor: "#014955",
           paddingTop: 15,
-          height:100
+          height: 100,
         },
       })}
     >
@@ -76,3 +83,5 @@ const BottomTabs = () => {
 };
 
 export default BottomTabs;
+
+

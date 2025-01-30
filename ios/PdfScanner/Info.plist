@@ -47,9 +47,13 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera to take pictures.</string>
+	<string>We need access to your camera to scan documents.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need access to your microphone for video recording.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need access to save captured images to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library to save pictures.</string>
+	<string>We need access to your photo library to select and save images.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>AntDesign.ttf</string>

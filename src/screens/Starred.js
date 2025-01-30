@@ -143,12 +143,17 @@ const Starred = ({ route }) => {
         return (
             <View style={{ flexDirection: viewData === 'grid' ? 'column' : 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: viewData === 'grid' ? 0 : 1, borderColor: "#ccc" }}>
                 <TouchableOpacity style={viewData === 'grid' ? styles.gridItems : styles.listItems} onPress={handleFilePress}>
-                    <AntDesign
+                <Image
+                        source={{ uri: item.filePath || 'default_thumbnail_url_here' }} // Use a default thumbnail if none provided
+                        style={viewData === 'grid' ? {width: 100, height: 100, borderRadius: 5} : {width: 40, height: 40, borderRadius: 5}} // Style the thumbnail as needed
+                    />
+                    
+                    {/* <AntDesign
                         name={item.name.endsWith(".pdf") ? "pdffile1" : "jpgfile1"}
                         size={viewData === 'grid' ? 30 : 40}
                         color={item.name.endsWith(".pdf") ? "red" : "#014955"}
-                    />
-                    <Text>{item.name.substring(0, 30)}{item.name.length > 30 ? item.name.endsWith(".pdf") ? '.. .pdf' : '.. .jpg' : ''}</Text>
+                    /> */}
+                    <Text>{item.name.substring(0, 20)}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => handleOptions(item)} style={{ position: 'relative' }}>
                     <SimpleLineIcons name={viewData === "grid" ? 'options' : "options-vertical"} size={20} color="#014955" style={{ marginLeft: 10 }} />
@@ -157,33 +162,37 @@ const Starred = ({ route }) => {
                             style={styles.overlay}
                             onPress={() => setVisible(false)}
                         />
-                        <View style={styles.dropdown}>
+                        <View style={[styles.dropdown]}>
                             <View style={{ borderBottomWidth: 1, borderColor: "#ccc", alignItems: 'flex-start', justifyContent: 'center', height: 40, paddingBottom: 8, marginBottom: 10 }}>
                                 <AntDesign name="close" size={25} color="#014955" style={{ marginLeft: 10 }} onPress={() => setVisible(false)} />
                             </View>
-                            <Pressable key='Edit' onPress={() => handlePress('Edit')} style={styles.modalPressable} >
-                                <FontAwesome name='edit' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Edit PDF</Text>
-                            </Pressable>
-                            <Pressable key='Export PDF' onPress={() => handlePress('Export PDF')} style={styles.modalPressable} >
-                                <Foundation name='page-export-pdf' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Export PDF</Text>
-                            </Pressable>
-                            <Pressable key='Compress PDF' onPress={() => handlePress('Compress PDF')} style={styles.modalPressable} >
-                                <MaterialIcons name='compress' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Compress PDF</Text>
-                            </Pressable>
+                            {selectedItem && selectedItem.name.endsWith('.pdf') ? (<>
+                                <Pressable key='Edit' onPress={() => handleEdit(selectedItem)} style={styles.modalPressable} >
+                                    <FontAwesome name='edit' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Edit PDF</Text>
+                                </Pressable>
+                                <Pressable key='Compress PDF' onPress={() => handlePress('Compress PDF')} style={styles.modalPressable} >
+                                    <MaterialIcons name='compress' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Compress PDF</Text>
+                                </Pressable>
+                                <Pressable key='Lock' onPress={() => handlePress('Lock')} style={styles.modalPressable} >
+                                    <MaterialIcons name='password' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Set Password</Text>
+                                </Pressable>
+                            </>) : ''}
                             <Pressable key='Send' onPress={() => handlePress('Send')} style={styles.modalPressable} >
                                 <MaterialCommunityIcons name='email-send-outline' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Send</Text>
+                                <Text style={styles.modalText}>Share</Text>
                             </Pressable>
-                            <Pressable key='Lock' onPress={() => handlePress('Lock')} style={styles.modalPressable} >
-                                <MaterialIcons name='password' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Set Password</Text>
-                            </Pressable>
+                            {selectedItem && selectedItem.name.endsWith('.jpg') ? (
+                                <Pressable key='Export PDF' onPress={() => handlePress('Export PDF')} style={styles.modalPressable} >
+                                    <Foundation name='page-export-pdf' size={24} color='black' style={{ width: 30 }} />
+                                    <Text style={styles.modalText}>Convert to PDF</Text>
+                                </Pressable>
+                            ) : ''}
                             <Pressable key='Star' onPress={() => handleStar(selectedItem.id)} style={styles.modalPressable} >
-                                <FontAwesome name='star' size={24} color='black' style={{ width: 30 }} />
-                                <Text style={styles.modalText}>Unstar</Text>
+                                <FontAwesome name={selectedItem.starred === true ? 'star' : 'star-o'} size={24} color='black' style={{ width: 30 }} />
+                                <Text style={styles.modalText}>{selectedItem.starred === true ? 'Unstar' : 'Star'}</Text>
                             </Pressable>
                             <Pressable key='Rename' onPress={() => handlePress('Rename')} style={styles.modalPressable} >
                                 <MaterialCommunityIcons name='rename-box' size={24} color='black' style={{ width: 30 }} />
@@ -242,7 +251,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         backgroundColor: "#f0f0f0",
         padding: 10,
-        height: 120,
+        height: 170,
         width: 110,
         borderRadius: 10,
         borderWidth: .2,
@@ -309,9 +318,9 @@ const styles = StyleSheet.create({
         backgroundColor: "#fff",
         borderRadius: 15,
         padding: 10,
-        height: '52%',
         marginLeft: 2,
-        marginRight: 2
+        marginRight: 2,
+        paddingBottom: '10%'
     },
     dropdownItem: {
         padding: 10,
@@ -324,7 +333,7 @@ const styles = StyleSheet.create({
     },
     modalPressable: {
         flexDirection: 'row',
-        padding: 10, 
+        padding: 10,
         width: '100%',
         gap: 15,
         justifyContent: 'flex-start',
